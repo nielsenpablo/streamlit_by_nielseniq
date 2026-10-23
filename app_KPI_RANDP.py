@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-from io import BytesIO
+import os
 
 # =====================================
 # CONFIGURACIÓN
@@ -18,7 +18,7 @@ st.set_page_config(
 # =====================================
 
 st.title("Equipo Automatizaciones")
-st.write("Manejo de proyectos y avances.")
+st.write("Manejo de proyectos y avances")
 
 st.subheader("Integrantes")
 st.write("• Rodriguez Meza Pablo Adair")
@@ -27,25 +27,32 @@ st.write("• Hernandez Caltenco Jadiel Roberto")
 st.divider()
 
 # =====================================
-# ARCHIVO EXCEL
+# EXCEL
 # =====================================
 
-archivo = "control_proyectos.xlsx"
+archivo_excel = "control_proyectos.xlsx"
 
 # =====================================
-# CARGA DE DATOS
+# REPOSITORIO DOCUMENTAL
 # =====================================
 
-if Path(archivo).exists():
+CARPETA_DOCS = "repositorio_documentos"
+
+os.makedirs(CARPETA_DOCS, exist_ok=True)
+
+# =====================================
+# CARGAR DATOS
+# =====================================
+
+if Path(archivo_excel).exists():
 
     try:
         df = pd.read_excel(
-            archivo,
+            archivo_excel,
             engine="openpyxl"
         )
 
     except Exception as e:
-
         st.error(f"Error leyendo Excel: {e}")
         st.stop()
 
@@ -92,10 +99,36 @@ else:
     )
 
 # =====================================
-# EDITOR DE PROYECTOS
+# DASHBOARD
 # =====================================
 
 st.header("📋 Control de Proyectos")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric(
+        "Total Proyectos",
+        len(df)
+    )
+
+with col2:
+    st.metric(
+        "Promedio Avance",
+        f"{round(df['Avance'].mean(),1)}%"
+    )
+
+with col3:
+    terminados = len(df[df["Status"] == "Entregado"])
+
+    st.metric(
+        "Entregados",
+        terminados
+    )
+
+# =====================================
+# EDITOR
+# =====================================
 
 df_editado = st.data_editor(
     df,
@@ -112,7 +145,6 @@ df_editado = st.data_editor(
                 "Otros"
             ]
         ),
-
         "Status": st.column_config.SelectboxColumn(
             "Status",
             options=[
@@ -122,7 +154,6 @@ df_editado = st.data_editor(
                 "Entregado"
             ]
         ),
-
         "Avance": st.column_config.NumberColumn(
             "Avance (%)",
             min_value=0,
@@ -141,17 +172,17 @@ if st.button("💾 Guardar cambios"):
     try:
 
         with pd.ExcelWriter(
-            archivo,
+            archivo_excel,
             engine="openpyxl"
         ) as writer:
 
             df_editado.to_excel(
                 writer,
-                index=False,
-                sheet_name="Proyectos"
+                sheet_name="Proyectos",
+                index=False
             )
 
-        st.success("✅ Cambios guardados")
+        st.success("✅ Cambios guardados correctamente")
 
     except Exception as e:
 
@@ -165,106 +196,129 @@ st.divider()
 
 st.header("📁 Repositorio de Documentos")
 
-# Inicializar almacenamiento
+if len(df_editado) > 0:
 
-if "repositorio" not in st.session_state:
-    st.session_state.repositorio = {}
+    proyecto = st.selectbox(
+        "Selecciona un proyecto",
+        df_editado["Tarea"].dropna().unique()
+    )
 
-# Selección de proyecto
+    nombre_carpeta = "".join(
+        c for c in proyecto
+        if c.isalnum() or c in (" ", "-", "_")
+    ).strip()
 
-proyecto = st.selectbox(
-    "Selecciona un proyecto",
-    df_editado["Tarea"].unique()
-)
+    ruta_proyecto = os.path.join(
+        CARPETA_DOCS,
+        nombre_carpeta
+    )
 
-if proyecto not in st.session_state.repositorio:
-    st.session_state.repositorio[proyecto] = []
+    os.makedirs(
+        ruta_proyecto,
+        exist_ok=True
+    )
 
-# Cargar documentos
+    # =============================
+    # SUBIR ARCHIVOS
+    # =============================
 
-archivos_subidos = st.file_uploader(
-    "Subir documentos",
-    accept_multiple_files=True,
-    type=[
-        "pdf",
-        "xlsx",
-        "xls",
-        "csv",
-        "docx",
-        "pptx",
-        "png",
-        "jpg",
-        "jpeg",
-        "txt"
-    ]
-)
+    archivos_subidos = st.file_uploader(
+        f"Subir documentos para: {proyecto}",
+        accept_multiple_files=True,
+        type=[
+            "pdf",
+            "xlsx",
+            "xls",
+            "csv",
+            "docx",
+            "pptx",
+            "txt",
+            "png",
+            "jpg",
+            "jpeg"
+        ]
+    )
 
-# Guardar documentos
+    if archivos_subidos:
 
-if archivos_subidos:
+        for archivo in archivos_subidos:
 
-    for archivo_subido in archivos_subidos:
-
-        existe = any(
-            doc["nombre"] == archivo_subido.name
-            for doc in st.session_state.repositorio[proyecto]
-        )
-
-        if not existe:
-
-            st.session_state.repositorio[proyecto].append(
-                {
-                    "nombre": archivo_subido.name,
-                    "tipo": archivo_subido.type,
-                    "contenido": archivo_subido.getvalue()
-                }
+            ruta_archivo = os.path.join(
+                ruta_proyecto,
+                archivo.name
             )
 
-    st.success("✅ Documentos agregados")
+            with open(
+                ruta_archivo,
+                "wb"
+            ) as f:
 
-# =====================================
-# LISTA DE DOCUMENTOS
-# =====================================
+                f.write(
+                    archivo.getbuffer()
+                )
 
-st.subheader(f"📂 Documentos de: {proyecto}")
+        st.success("✅ Documentos guardados")
 
-documentos = st.session_state.repositorio[proyecto]
+    # =============================
+    # LISTAR DOCUMENTOS
+    # =============================
 
-if len(documentos) == 0:
+    st.subheader("Documentos disponibles")
 
-    st.info("No hay documentos cargados para este proyecto.")
+    archivos = sorted(
+        os.listdir(ruta_proyecto)
+    )
+
+    if archivos:
+
+        for archivo in archivos:
+
+            ruta_archivo = os.path.join(
+                ruta_proyecto,
+                archivo
+            )
+
+            col1, col2, col3 = st.columns(
+                [6, 1, 1]
+            )
+
+            col1.write(f"📄 {archivo}")
+
+            with col2:
+
+                with open(
+                    ruta_archivo,
+                    "rb"
+                ) as f:
+
+                    st.download_button(
+                        "⬇️",
+                        f.read(),
+                        file_name=archivo,
+                        key=f"download_{archivo}"
+                    )
+
+            with col3:
+
+                if st.button(
+                    "🗑️",
+                    key=f"delete_{archivo}"
+                ):
+
+                    os.remove(
+                        ruta_archivo
+                    )
+
+                    st.rerun()
+
+    else:
+
+        st.info(
+            "No existen documentos para este proyecto."
+        )
 
 else:
 
-    for i, doc in enumerate(documentos):
-
-        col1, col2 = st.columns([5, 1])
-
-        with col1:
-            st.write(f"📄 {doc['nombre']}")
-
-        with col2:
-
-            st.download_button(
-                label="⬇️",
-                data=doc["contenido"],
-                file_name=doc["nombre"],
-                mime=doc["tipo"],
-                key=f"descargar_{proyecto}_{i}"
-            )
-
-# =====================================
-# RESUMEN
-# =====================================
-
-st.divider()
-
-st.metric(
-    "Total proyectos",
-    len(df_editado)
-)
-
-st.metric(
-    "Promedio avance (%)",
-    round(df_editado["Avance"].mean(), 1)
-)
+    st.warning(
+        "Agrega al menos un proyecto para utilizar el repositorio documental."
+    )
