@@ -235,7 +235,8 @@ if len(df_editado) > 0:
             "txt",
             "png",
             "jpg",
-            "jpeg"
+            "jpeg",
+            "zip
         ]
     )
 
@@ -265,10 +266,20 @@ if len(df_editado) > 0:
 
     st.subheader("Documentos disponibles")
 
-    archivos = sorted(
-        os.listdir(ruta_proyecto)
-    )
+ archivos = []
 
+for raiz, carpetas, ficheros in os.walk(ruta_proyecto):
+
+    for fichero in ficheros:
+
+        ruta_relativa = os.path.relpath(
+            os.path.join(raiz, fichero),
+            ruta_proyecto
+        )
+
+        archivos.append(ruta_relativa)
+
+archivos.sort()
     if archivos:
 
         for archivo in archivos:
