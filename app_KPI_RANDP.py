@@ -1,154 +1,72 @@
-import streamlit as st
-import pandas as pd
-from pathlib import Path
-
-
 # =====================================
-# CONFIGURACIÓN
+# REPOSITORIO DE DOCUMENTOS
 # =====================================
-
-st.set_page_config(
-    page_title="Control de Proyectos",
-    page_icon="📊",
-    layout="wide"
-)
-
-# =====================================
-# TÍTULO
-# =====================================
-
-st.title("Equipo Automatizaciones")
-st.write("Manejo de proyectos y avances.")
-
-st.subheader("Integrantes")
-st.write("• Rodriguez Meza Pablo Adair")
-st.write("• Hernandez Caltenco Jadiel Roberto")
 
 st.divider()
+st.subheader("📁 Repositorio de Documentos")
 
-# =====================================
-# ARCHIVO EXCEL
-# =====================================
-
-archivo = "control_proyectos.xlsx"
-
-# =====================================
-# CARGAR DATOS
-# =====================================
-
-try:
-    if Path(archivo).exists():
-        df = pd.read_excel(archivo, engine="openpyxl")
-    else:
-        df = pd.DataFrame(
-            {
-                "Tarea": [
-                    "Herramienta Caracterizadora PC 095 PI",
-                    "Dashboard Performance",
-                    "Asignación MELI",
-                ],
-                "Area/Equipo": [
-                    "Monse, Erick, Olga",
-                    "Antonio de Jesús",
-                    "Ana Fragoso",
-                ],
-                "Responsable": [
-                    "Pablo",
-                    "Roberto",
-                    "Pablo",
-                ],
-                "Fecha Entrega": [
-                    "2026-10-07",
-                    "2026-10-05",
-                    "2026-10-02",
-                ],
-                "Avance": [
-                    90,
-                    95,
-                    70,
-                ],
-                "Status": [
-                    "En Revisión",
-                    "Pendiente",
-                    "Entregado",
-                ],
-                "Comentarios": [
-                    "Pendiente cerrar con equipo",
-                    "Mejoras",
-                    "Ver avance de código",
-                ],
-            }
-        )
-
-except Exception as e:
-    st.error(f"Error al leer el archivo Excel: {e}")
-    st.stop()
-
-# =====================================
-# EDITOR
-# =====================================
-
-st.title("Control de Proyectos")
-
-df_editado = st.data_editor(
-    df,
-    hide_index=True,
-    use_container_width=True,
-    num_rows="dynamic",
-    column_config={
-        "Responsable": st.column_config.SelectboxColumn(
-            "Responsable",
-            options=[
-                "Pablo",
-                "Roberto",
-                "Todos",
-                "Otros",
-            ],
-        ),
-        "Status": st.column_config.SelectboxColumn(
-            "Status",
-            options=[
-                "Pendiente",
-                "En Curso",
-                "En Revisión",
-                "Entregado",
-            ],
-        ),
-        "Avance": st.column_config.NumberColumn(
-            "Avance (%)",
-            min_value=0,
-            max_value=100,
-            step=1,
-            format="%d",
-        ),
-    },
+# Selección de proyecto
+proyecto = st.selectbox(
+    "Proyecto",
+    df_editado["Tarea"].unique()
 )
 
-# =====================================
-# GUARDAR CAMBIOS
-# =====================================
+# Cargar archivos
+archivos_subidos = st.file_uploader(
+    f"Subir documentos para: {proyecto}",
+    accept_multiple_files=True,
+    type=["pdf", "docx", "xlsx", "csv", "png", "jpg", "jpeg"]
+)
 
-if st.button("💾 Guardar cambios"):
-    try:
-        with pd.ExcelWriter(
-            archivo,
-            engine="openpyxl",
-            mode="w"
-        ) as writer:
-            df_editado.to_excel(
-                writer,
-                index=False,
-                sheet_name="Proyectos"
+# Inicializar almacenamiento en sesión
+if "repositorio" not in st.session_state:
+    st.session_state.repositorio = {}
+
+if proyecto not in st.session_state.repositorio:
+    st.session_state.repositorio[proyecto] = []
+
+# Guardar archivos en memoria
+if archivos_subidos:
+    for archivo in archivos_subidos:
+
+        existe = any(
+            doc["nombre"] == archivo.name
+            for doc in st.session_state.repositorio[proyecto]
+        )
+
+        if not existe:
+            st.session_state.repositorio[proyecto].append(
+                {
+                    "nombre": archivo.name,
+                    "tipo": archivo.type,
+                    "contenido": archivo.getvalue()
+                }
             )
 
-        st.success("✅ Cambios guardados correctamente")
+    st.success("✅ Documentos agregados")
 
-    except Exception as e:
-        st.error(f"❌ Error al guardar: {e}")
+# Mostrar documentos
+st.markdown("### Documentos del proyecto")
 
-# =====================================
-# INFORMACIÓN DE DIAGNÓSTICO
-# =====================================
+documentos = st.session_state.repositorio[proyecto]
 
+if documentos:
 
+    for i, doc in enumerate(documentos):
 
+        col1, col2 = st.columns([4, 1])
+
+        with col1:
+            st.write(f"📄 {doc['nombre']}")
+
+        with col2:
+            st.download_button(
+                label="⬇️",
+                data=doc["contenido"],
+                file_name=doc["nombre"],
+                mime=doc["tipo"],
+                key=f"descarga_{proyecto}_{i}"
+            )
+
+else:
+    st.info("No hay documentos cargados para este proyecto.")
