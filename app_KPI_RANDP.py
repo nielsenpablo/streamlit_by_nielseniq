@@ -150,7 +150,5 @@ if st.button("💾 Guardar cambios"):
 # INFORMACIÓN DE DIAGNÓSTICO
 # =====================================
 
-with st.expander("Diagnóstico"):
-    st.write("Versión OpenPyXL:", openpyxl.__version__)
-    st.write("Archivo existe:", Path(archivo).exists())
+
 
