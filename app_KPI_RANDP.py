@@ -236,7 +236,7 @@ if len(df_editado) > 0:
             "png",
             "jpg",
             "jpeg",
-            "zip
+            "zip"
         ]
     )
 
