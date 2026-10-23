@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import os
+import io
+import zipfile
 
 # =====================================
 # CONFIGURACIÓN
@@ -27,7 +29,7 @@ st.write("• Hernandez Caltenco Jadiel Roberto")
 st.divider()
 
 # =====================================
-# EXCEL
+# ARCHIVO EXCEL
 # =====================================
 
 archivo_excel = "control_proyectos.xlsx"
@@ -37,7 +39,6 @@ archivo_excel = "control_proyectos.xlsx"
 # =====================================
 
 CARPETA_DOCS = "repositorio_documentos"
-
 os.makedirs(CARPETA_DOCS, exist_ok=True)
 
 # =====================================
@@ -47,13 +48,18 @@ os.makedirs(CARPETA_DOCS, exist_ok=True)
 if Path(archivo_excel).exists():
 
     try:
+
         df = pd.read_excel(
             archivo_excel,
             engine="openpyxl"
         )
 
     except Exception as e:
-        st.error(f"Error leyendo Excel: {e}")
+
+        st.error(
+            f"Error leyendo Excel: {e}"
+        )
+
         st.stop()
 
 else:
@@ -99,7 +105,7 @@ else:
     )
 
 # =====================================
-# DASHBOARD
+# MÉTRICAS
 # =====================================
 
 st.header("📋 Control de Proyectos")
@@ -107,23 +113,36 @@ st.header("📋 Control de Proyectos")
 col1, col2, col3 = st.columns(3)
 
 with col1:
+
     st.metric(
         "Total Proyectos",
         len(df)
     )
 
 with col2:
+
+    promedio = 0
+
+    if len(df) > 0:
+        promedio = round(
+            df["Avance"].mean(),
+            1
+        )
+
     st.metric(
         "Promedio Avance",
-        f"{round(df['Avance'].mean(),1)}%"
+        f"{promedio}%"
     )
 
 with col3:
-    terminados = len(df[df["Status"] == "Entregado"])
+
+    entregados = len(
+        df[df["Status"] == "Entregado"]
+    )
 
     st.metric(
         "Entregados",
-        terminados
+        entregados
     )
 
 # =====================================
@@ -182,11 +201,15 @@ if st.button("💾 Guardar cambios"):
                 index=False
             )
 
-        st.success("✅ Cambios guardados correctamente")
+        st.success(
+            "✅ Cambios guardados correctamente"
+        )
 
     except Exception as e:
 
-        st.error(f"❌ Error al guardar: {e}")
+        st.error(
+            f"❌ Error al guardar: {e}"
+        )
 
 # =====================================
 # REPOSITORIO DOCUMENTAL
@@ -198,135 +221,198 @@ st.header("📁 Repositorio de Documentos")
 
 if len(df_editado) > 0:
 
-    proyecto = st.selectbox(
-        "Selecciona un proyecto",
-        df_editado["Tarea"].dropna().unique()
-    )
+    proyectos_validos = df_editado[
+        "Tarea"
+    ].dropna().unique()
 
-    nombre_carpeta = "".join(
-        c for c in proyecto
-        if c.isalnum() or c in (" ", "-", "_")
-    ).strip()
+    if len(proyectos_validos) > 0:
 
-    ruta_proyecto = os.path.join(
-        CARPETA_DOCS,
-        nombre_carpeta
-    )
+        proyecto = st.selectbox(
+            "Selecciona un proyecto",
+            proyectos_validos
+        )
 
-    os.makedirs(
-        ruta_proyecto,
-        exist_ok=True
-    )
-
-    # =============================
-    # SUBIR ARCHIVOS
-    # =============================
-
-    archivos_subidos = st.file_uploader(
-        f"Subir documentos para: {proyecto}",
-        accept_multiple_files=True,
-        type=[
-            "pdf",
-            "xlsx",
-            "xls",
-            "csv",
-            "docx",
-            "pptx",
-            "txt",
-            "png",
-            "jpg",
-            "jpeg",
-            "zip"
-        ]
-    )
-
-    if archivos_subidos:
-
-        for archivo in archivos_subidos:
-
-            ruta_archivo = os.path.join(
-                ruta_proyecto,
-                archivo.name
+        nombre_carpeta = "".join(
+            c for c in proyecto
+            if c.isalnum() or c in (
+                " ",
+                "-",
+                "_"
             )
+        ).strip()
 
-            with open(
-                ruta_archivo,
-                "wb"
-            ) as f:
+        ruta_proyecto = os.path.join(
+            CARPETA_DOCS,
+            nombre_carpeta
+        )
 
-                f.write(
-                    archivo.getbuffer()
+        os.makedirs(
+            ruta_proyecto,
+            exist_ok=True
+        )
+
+        # =============================
+        # SUBIR DOCUMENTOS
+        # =============================
+
+        archivos_subidos = st.file_uploader(
+            f"Subir documentos para: {proyecto}",
+            accept_multiple_files=True,
+            type=[
+                "pdf",
+                "xlsx",
+                "xls",
+                "csv",
+                "docx",
+                "pptx",
+                "txt",
+                "png",
+                "jpg",
+                "jpeg",
+                "zip"
+            ]
+        )
+
+        if archivos_subidos:
+
+            for archivo in archivos_subidos:
+
+                try:
+
+                    # ZIP
+
+                    if archivo.name.lower().endswith(
+                        ".zip"
+                    ):
+
+                        zip_bytes = io.BytesIO(
+                            archivo.getvalue()
+                        )
+
+                        with zipfile.ZipFile(
+                            zip_bytes,
+                            "r"
+                        ) as zip_ref:
+
+                            zip_ref.extractall(
+                                ruta_proyecto
+                            )
+
+                        st.success(
+                            f"✅ ZIP cargado: {archivo.name}"
+                        )
+
+                    # ARCHIVO NORMAL
+
+                    else:
+
+                        ruta_archivo = os.path.join(
+                            ruta_proyecto,
+                            archivo.name
+                        )
+
+                        with open(
+                            ruta_archivo,
+                            "wb"
+                        ) as f:
+
+                            f.write(
+                                archivo.getbuffer()
+                            )
+
+                        st.success(
+                            f"✅ Archivo guardado: {archivo.name}"
+                        )
+
+                except Exception as e:
+
+                    st.error(
+                        f"Error cargando {archivo.name}: {e}"
+                    )
+
+        # =============================
+        # LISTAR DOCUMENTOS
+        # =============================
+
+        st.subheader(
+            "📂 Documentos disponibles"
+        )
+
+        archivos = []
+
+        for raiz, carpetas, ficheros in os.walk(
+            ruta_proyecto
+        ):
+
+            for fichero in ficheros:
+
+                ruta_relativa = os.path.relpath(
+                    os.path.join(
+                        raiz,
+                        fichero
+                    ),
+                    ruta_proyecto
                 )
 
-        st.success("✅ Documentos guardados")
+                archivos.append(
+                    ruta_relativa
+                )
 
-    # =============================
-    # LISTAR DOCUMENTOS
-    # =============================
+        archivos.sort()
 
-    st.subheader("Documentos disponibles")
+        if archivos:
 
- archivos = []
+            for archivo in archivos:
 
-for raiz, carpetas, ficheros in os.walk(ruta_proyecto):
+                ruta_archivo = os.path.join(
+                    ruta_proyecto,
+                    archivo
+                )
 
-    for fichero in ficheros:
+                col1, col2, col3 = st.columns(
+                    [6, 1, 1]
+                )
 
-        ruta_relativa = os.path.relpath(
-            os.path.join(raiz, fichero),
-            ruta_proyecto
-        )
+                with col1:
 
-        archivos.append(ruta_relativa)
-
-archivos.sort()
-    if archivos:
-
-        for archivo in archivos:
-
-            ruta_archivo = os.path.join(
-                ruta_proyecto,
-                archivo
-            )
-
-            col1, col2, col3 = st.columns(
-                [6, 1, 1]
-            )
-
-            col1.write(f"📄 {archivo}")
-
-            with col2:
-
-                with open(
-                    ruta_archivo,
-                    "rb"
-                ) as f:
-
-                    st.download_button(
-                        "⬇️",
-                        f.read(),
-                        file_name=archivo,
-                        key=f"download_{archivo}"
+                    st.write(
+                        f"📄 {archivo}"
                     )
 
-            with col3:
+                with col2:
 
-                if st.button(
-                    "🗑️",
-                    key=f"delete_{archivo}"
-                ):
+                    with open(
+                        ruta_archivo,
+                        "rb"
+                    ) as f:
 
-                    os.remove(
-                        ruta_archivo
-                    )
+                        st.download_button(
+                            "⬇️",
+                            data=f.read(),
+                            file_name=os.path.basename(
+                                archivo
+                            ),
+                            key=f"download_{archivo}"
+                        )
 
-                    st.rerun()
+                with col3:
 
-    else:
+                    if st.button(
+                        "🗑️",
+                        key=f"delete_{archivo}"
+                    ):
 
-        st.info(
-            "No existen documentos para este proyecto."
-        )
+                        os.remove(
+                            ruta_archivo
+                        )
+
+                        st.rerun()
+
+        else:
+
+            st.info(
+                "No existen documentos para este proyecto."
+            )
 
 else:
 
