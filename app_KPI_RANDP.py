@@ -270,7 +270,8 @@ if len(df_editado) > 0:
                 "jpg",
                 "jpeg",
                 "zip",
-                "py"
+                "py",
+                "json"
             ]
         )
 
