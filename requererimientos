@@ -1,5 +1,5 @@
-streamlit
-pandas
-numpy
-pathlib
-openpyxl
+streamlit>=1.40
+pandas>=2.2
+numpy>=2.0
+openpyxl>=3.1.5
+pathlib 
